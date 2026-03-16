@@ -9,7 +9,7 @@ cat > $outfile <<'EOF'
 name: tp0
 
 networks:
-  net_ej_1:
+  tp0_net:
     ipam:
       driver: default
       config:
@@ -24,7 +24,9 @@ services:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
     networks:
-      - net_ej_1
+      - tp0_net
+    volumes:
+      - ./server/config.ini:/config.ini
 
 EOF
 
@@ -37,8 +39,10 @@ for i in $(seq 1 "$num_clients"); do
     environment:
       - CLI_ID=${i}
       - CLI_LOG_LEVEL=DEBUG
+    volumes:
+      - ./client/config.yaml:/config.yaml
     networks:
-      - net_ej_1
+      - tp0_net
     depends_on:
       - server
 
