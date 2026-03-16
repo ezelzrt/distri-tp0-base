@@ -6,10 +6,11 @@ echo "output file: $outfile"
 echo "number of clients: $num_clients"
 
 cat > $outfile <<'EOF'
-name: tp0
+name: distri_tp0
 
 networks:
   tp0_net:
+    name: tp0_net
     ipam:
       driver: default
       config:
