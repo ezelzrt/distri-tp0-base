@@ -6,11 +6,10 @@ echo "output file: $outfile"
 echo "number of clients: $num_clients"
 
 cat > $outfile <<'EOF'
-name: distri_tp0
+name: tp0
 
 networks:
-  tp0_net:
-    name: tp0_net
+  testing_net:
     ipam:
       driver: default
       config:
@@ -24,7 +23,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     networks:
-      - tp0_net
+      - testing_net
     volumes:
       - ./server/config.ini:/config.ini
 
@@ -41,7 +40,7 @@ for i in $(seq 1 "$num_clients"); do
     volumes:
       - ./client/config.yaml:/config.yaml
     networks:
-      - tp0_net
+      - testing_net
     depends_on:
       - server
 

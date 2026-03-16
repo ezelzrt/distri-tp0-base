@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NETWORK="tp0_net"
+NETWORK="tp0_testing_net"
 SERVER_HOST="server"
 SERVER_PORT=12345
 TEST_MSG="es igual"
