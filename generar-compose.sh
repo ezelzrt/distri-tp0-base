@@ -22,7 +22,6 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
-      - LOGGING_LEVEL=DEBUG
     networks:
       - tp0_net
     volumes:
@@ -38,7 +37,6 @@ for i in $(seq 1 "$num_clients"); do
     entrypoint: /client
     environment:
       - CLI_ID=${i}
-      - CLI_LOG_LEVEL=DEBUG
     volumes:
       - ./client/config.yaml:/config.yaml
     networks:
