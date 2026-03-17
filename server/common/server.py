@@ -1,5 +1,7 @@
 import socket
 import logging
+import signal
+import threading
 
 
 class Server:
@@ -9,6 +11,14 @@ class Server:
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
 
+        self._server_socket.settimeout(1.0)
+        self._threads = []
+        self._clients_sockets = {}
+        self._clients_lock = threading.Lock()
+        self._stop_event = threading.Event()
+        signal.signal(signal.SIGTERM, self.sigterm_handler)
+        signal.signal(signal.SIGINT, self.sigterm_handler)
+
     def run(self):
         """
         Dummy Server loop
@@ -17,12 +27,33 @@ class Server:
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
+        while not self._stop_event.is_set():
+            try:
+                client_sock = self.__accept_new_connection()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            
+            client_thread = threading.Thread(target=self.__handle_client_connection, args=(client_sock,))
+            client_thread.start()
+            key = client_sock.fileno()
+            with self._clients_lock:
+                self._clients_sockets[key] = client_sock
+            self._threads.append(client_thread)
+        
+    def sigterm_handler(self, signum, frame):
+        logging.info("action: shutdown | result: in_progress")
+        self._stop_event.set()
+        self._server_socket.close()
+        
+        with self._clients_lock:
+            for s in self._clients_sockets.values():
+                s.close()
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
-        while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+        for t in self._threads:
+            t.join()
+        logging.info("action: shutdown | result: success")
 
     def __handle_client_connection(self, client_sock):
         """
@@ -41,7 +72,10 @@ class Server:
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
+            key = client_sock.fileno()
             client_sock.close()
+            with self._clients_lock:
+                self._clients_sockets.pop(key, None)
 
     def __accept_new_connection(self):
         """
