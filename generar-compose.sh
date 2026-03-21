@@ -38,7 +38,7 @@ for i in $(seq 1 "$num_clients"); do
     environment:
       - CLI_ID=${i}
     env_file:
-      - ./client/.env
+      - .env
     volumes:
       - ./client/config.yaml:/config.yaml
     networks:
