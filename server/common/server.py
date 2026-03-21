@@ -2,6 +2,8 @@ import socket
 import logging
 import signal
 import threading
+import protocol
+from common import utils
 
 
 class Server:
@@ -63,14 +65,21 @@ class Server:
         client socket will also be closed
         """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
+
+            msg_type, payload = protocol.read_message(client_sock)
+            if msg_type != protocol.TYPE_BET:
+                raise ValueError(f"Expected bet type {protocol.TYPE_BET}, got {msg_type}")
             addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            
+            bet = utils.deserialize_bet(payload)
+            logging.info(f'action: store_bet | result: in_progress | ip: {addr[0]} | msg: {bet.__dict__}')
+            utils.store_bets([bet])
+
+            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
+            protocol.send_message(client_sock, protocol.TYPE_ACK, b"")
+
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:
             key = client_sock.fileno()
             client_sock.close()

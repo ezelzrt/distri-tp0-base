@@ -49,3 +49,10 @@ def load_bets() -> list[Bet]:
         for row in reader:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
+
+def deserialize_bet(bet_b: bytes) -> Bet:
+    bet_str = bet_b.decode('utf-8')
+    fields = bet_str.split(";")
+    if len(fields) != 5:
+        raise ValueError(f"Invalid bet format: {bet_str}")
+    return Bet(agency="1", first_name=fields[0], last_name=fields[1], document=fields[2], birthdate=fields[3], number=fields[4])

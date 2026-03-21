@@ -1,15 +1,15 @@
 package common
 
 import (
-	"bufio"
 	"context"
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/domain"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
 	"github.com/op/go-logging"
 )
 
@@ -23,17 +23,21 @@ type ClientConfig struct {
 	LoopPeriod    time.Duration
 }
 
+
+
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
+	bets   []domain.Bet
 	conn   net.Conn
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig) *Client {
+func NewClient(config ClientConfig, bets []domain.Bet) *Client {
 	client := &Client{
 		config: config,
+		bets:   bets,
 	}
 	return client
 }
@@ -57,55 +61,60 @@ func (c *Client) createClientSocket() error {
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	ctx, cancel := context.WithCancel(context.Background())
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+    defer cancel()
+    sigc := make(chan os.Signal, 1)
+    signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-	<-sigc
-	cancel()
-	}()
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
+    // Graceful shutdown
+    go func() {
+        <-sigc
+        cancel()
+    }()
+	
+	c.createClientSocket()
+
+	for _, bet := range c.bets {
 		select {
-		case <-ctx.Done():
-			log.Infof("action: shutdown | result: fail | client_id: %v", c.config.ID)
-			return
-		default:
-		}
-		// Create the connection the server in every loop iteration. Send an
-		c.createClientSocket()
+        case <-ctx.Done():
+            log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
+            return
+        default:
+        }
 
-		go func() {
-			<-ctx.Done()
-			c.conn.Close()
-    	}()
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		c.conn.Close()
-
+		err := protocol.SendMsg(c.conn, protocol.BetType, bet.SerializeToCSV())
 		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
 				c.config.ID,
 				err,
 			)
 			return
 		}
 
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
-		)
+		msgType, _, err := protocol.ReadMsg(c.conn)
+		if err != nil {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		} else if msgType != protocol.AckType {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: unexpected message type %v",
+				c.config.ID,
+				msgType,
+			)
+			return
+		}
 
-		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
-
+		log.Infof("action: apuesta_enviada | result: success | client_id: %v | dni: %v | numero: %v",
+		c.config.ID,
+		bet.Document,
+		bet.Number,
+	)
+	
+	// // Wait a time between sending one message and the next one
+	// time.Sleep(c.config.LoopPeriod)
+	
 	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	c.conn.Close()
+	log.Infof("action: connection_closed | result: success | client_id: %v", c.config.ID)
 }

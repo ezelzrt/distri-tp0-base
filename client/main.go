@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/domain"
 )
 
 var log = logging.MustGetLogger("log")
@@ -110,6 +111,16 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	client := common.NewClient(clientConfig)
+	bets := []domain.Bet{
+		{
+			Name:      v.GetString("nombre"),
+			LastName:  v.GetString("apellido"),
+			Document:  v.GetString("documento"),
+			BirthDate: v.GetString("nacimiento"),
+			Number:    v.GetInt("numero"),
+		},
+	}
+
+	client := common.NewClient(clientConfig, bets)
 	client.StartClientLoop()
 }
