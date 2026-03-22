@@ -50,9 +50,15 @@ def load_bets() -> list[Bet]:
             yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
 
 
-def deserialize_bet(bet_b: bytes) -> Bet:
-    bet_str = bet_b.decode('utf-8')
-    fields = bet_str.split(";")
-    if len(fields) != 5:
-        raise ValueError(f"Invalid bet format: {bet_str}")
-    return Bet(agency="1", first_name=fields[0], last_name=fields[1], document=fields[2], birthdate=fields[3], number=fields[4])
+def deserialize_bets(bets_b: bytes) -> list[Bet]:
+    bet_str = bets_b.decode('utf-8')
+    bet_lines = bet_str.split("\n")
+    bets = []
+    for line in bet_lines:
+        if not line:
+            continue
+        fields = line.split(",")
+        if len(fields) != 5:
+            raise ValueError(f"Invalid bet format: {line}")
+        bets.append(Bet(agency="1", first_name=fields[0], last_name=fields[1], document=fields[2], birthdate=fields[3], number=fields[4]))
+    return bets

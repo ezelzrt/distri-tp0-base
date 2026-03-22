@@ -71,15 +71,27 @@ class Server:
                 raise ValueError(f"Expected bet type {protocol.TYPE_BET}, got {msg_type}")
             addr = client_sock.getpeername()
             
-            bet = utils.deserialize_bet(payload)
-            logging.info(f'action: store_bet | result: in_progress | ip: {addr[0]} | msg: {bet.__dict__}')
-            utils.store_bets([bet])
+            bets = utils.deserialize_bets(payload)
+            logging.info(f'action: store_bets | result: in_progress | ip: {addr[0]}')
+            utils.store_bets(bets)
+            logging.info(f'action: store_bets | result: success | ip: {addr[0]}')
+            protocol.send_message(client_sock, protocol.TYPE_ACK, b"0")
+            logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
 
-            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
-            protocol.send_message(client_sock, protocol.TYPE_ACK, b"")
+        except ValueError as e:
+            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
+            try:
+                protocol.send_message(client_sock, protocol.TYPE_ACK, b"1")
+            except Exception:
+                pass
 
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
+            try:
+                protocol.send_message(client_sock, protocol.TYPE_ACK, b"1")
+            except Exception:
+                pass
+
         finally:
             key = client_sock.fileno()
             client_sock.close()

@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/domain"
 )
 
 var log = logging.MustGetLogger("log")
@@ -109,18 +108,10 @@ func main() {
 		ID:            v.GetString("id"),
 		LoopAmount:    v.GetInt("loop.amount"),
 		LoopPeriod:    v.GetDuration("loop.period"),
+		MaxBatchSize:  v.GetInt("batch.maxAmount"),
+		BetsFilePath:  "./data/agency-" + v.GetString("id") + ".csv",
 	}
 
-	bets := []domain.Bet{
-		{
-			Name:      v.GetString("nombre"),
-			LastName:  v.GetString("apellido"),
-			Document:  v.GetString("documento"),
-			BirthDate: v.GetString("nacimiento"),
-			Number:    v.GetInt("numero"),
-		},
-	}
-
-	client := common.NewClient(clientConfig, bets)
+	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
 }

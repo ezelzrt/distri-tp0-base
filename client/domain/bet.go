@@ -15,15 +15,15 @@ type Bet struct {
 	Number    int
 }
 
-// SerializeToCSV convierte Bet a bytes CSV "nombre;apellido;documento;nacimiento;numero"
+// SerializeToCSV convierte Bet a bytes CSV "nombre,apellido,documento,nacimiento,numero"
 func (b Bet) SerializeToCSV() []byte {
-	return []byte(fmt.Sprintf("%s;%s;%s;%s;%d",
+	return []byte(fmt.Sprintf("%s,%s,%s,%s,%d",
 		b.Name, b.LastName, b.Document, b.BirthDate, b.Number))
 }
 
 // DeserializeBetCSV convierte payload CSV a Bet.
 func DeserializeBetCSV(data []byte) (Bet, error) {
-	fields := strings.SplitN(string(data), ";", 5)
+	fields := strings.SplitN(string(data), ",", 5)
 	if len(fields) != 5 {
 		return Bet{}, errors.New("invalid bet csv format")
 	}
