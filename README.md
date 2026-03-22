@@ -1,46 +1,58 @@
 # TP0: Docker + Comunicaciones + Concurrencia
 
-## Ejercicio 5 - Implementación de protocolo de apuestas
+## Ejercicio 6 - Procesamiento por batch
 
 ### Protocolo Implementado (Go/Python)
 
 Formato de cada mensaje:
 
 - 1 byte: `Type`
-  - `0` = apuesta (bet)
-  - `1` = confirmación (ack)
+  - `0` = batch de apuestas
+  - `1` = ACK
 - 4 bytes: `Length` en big-endian (tamaño del payload)
-- `Length` bytes: `Payload` (CSV UTF-8): `nombre;apellido;documento;nacimiento;numero`
+- `Length` bytes: `Payload` (UTF-8)
 
-#### Diagrama ASCII del paquete
+Para la request batch:
+- payload = apuestas CSV separadas por `\n`, cada apuesta con formato `A,B,00000000,2000-01-01,0` (nombre, apellido, documento, nacimiento, numero).
+
+Para el ACK:
+- payload `b"0"` = batch exitoso
+- payload `b"1"` = batch con error
+
+#### Diagrama ASCII del paquete batch
 
 ```
-+------+------------+----------------------------------------------------+
-| Type | Length     | Payload                                            |
-| (1B) | (4B BE)    | (N bytes)                                          |
-+------+------------+----------------------------------------------------+
-| 0x00 | 0x0000001F |  "Pepe;Martinez;12345678;1999-01-11;9091"         |
-+------+------------+----------------------------------------------------+
++------+------------+--------------------------------------------------------------+
+| Type | Length     | Payload                                                      |
+| (1B) | (4B BE)    | (N bytes)                                                    |
++------+------------+--------------------------------------------------------------+
+| 0x00 | 0x0000004B | "A,B,00000001,2000-01-01,1234\nC,D,00000002,2000-01-01,5678" |
++------+------------+--------------------------------------------------------------+
 ```
 
-- `Type`=0: envio de apuesta
-- `Type`=1: ACK de server (puede payload vacío o "OK")
+#### Diagrama ASCII del paquete ACK
+
+```
++------+------------+------------------+
+| Type | Length     | Payload          |
+| (1B) | (4B BE)    | (N bytes)        |
++------+------------+------------------+
+| 0x01 | 0x00000001 | "0" (success)    |
++------+------------+------------------+
+```
+
+---
 
 ### Ejecución de la solución
 
 1) Archivos de configuración
 
-- `client/config.yaml`: configuración cliente (server address, log level).
-- `server/config.ini`: configuración servidor (puerto, backlog, log level).
-- `client/.env`: variables de apuesta (CLI_NOMBRE, CLI_APELLIDO, CLI_DOCUMENTO, CLI_NACIMIENTO, CLI_NUMERO).
+- `client/config.yaml`: cliente (server address, log level, batch.maxAmount).
+- `server/config.ini`: servidor (puerto, backlog, log level).
 
-2) .env
+2) CSV de apuestas
 
-Copia el `.env.example` a `.env` antes de arrancar:
-
-```bash
-cp .env.example .env
-```
+- El cliente lee `./data/agency-<id>.csv`.
 
 3) Levantar el sistema
 
@@ -58,13 +70,13 @@ make docker-compose-logs
 # docker compose -f docker-compose-dev.yaml logs -f
 ```
 
-Debería de verse algo como:
+Debe verse:
 - `client1 | action: config | result: success ...`
-- `server | action: apuesta_almacenada | result: success | dni: ...`
-- `client1 | action: apuesta_enviada | result: success | dni: ...`
+- `server | action: apuesta_recibida | result: success | cantidad: N`
 
 5) Detener el sistema
 
 ```bash
 make docker-compose-down
 ```
+
