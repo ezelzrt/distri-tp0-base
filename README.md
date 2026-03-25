@@ -1,6 +1,13 @@
+## Aclaración
+Durante ejercicios anteriores ya se agrego paralelización en el servidor para atender múltiples clientes en simultáneo. Después en el ejercicio 7, para resolverlo se usaron barreras para sincronizar el sorteo con la consulta de ganadores. Por lo mencionado, en este ejercicio no fue necesario agregar nuevas funcionalidades o cambiar el codigo en sí.
+
+Igualmente, se agrego una sección de [concurrencia y sincronizacion](#concurrencia-y-sincronización) para explicar brevemente el uso y la implementación realizada.
+
+<br>
+
 # TP0: Docker + Comunicaciones + Concurrencia
 
-## Ejercicio 7
+## Ejercicio 8
 
 ### Protocolo Implementado (Go/Python)
 
@@ -52,6 +59,17 @@ Criterio de uso:
 
 #### Decisiones de Diseño
 Se decidió un formato de mensaje con un header fijo de 8 bytes para simplificar la implementación y mantener la claridad del protocolo (en lugar de empaquetar el flag EOF y el Agency ID en un solo byte). Esto para priorizar un código limpio y sencillo por sobre una, tal vez, micro-optimización de espacio prematura.
+
+#### Concurrencia y sincronización
+Para atender varios clientes al mismo tiempo, el servidor se ejecuta con múltiples hilos, y cada conexión se procesa en un hilo independiente.
+
+Este enfoque es adecuado en Python para este caso porque la carga principal del servidor está en operaciones de entrada/salida (red y archivos), no en cálculo intensivo de CPU. Por eso, aunque exista la limitación del GIL, el modelo sigue siendo efectivo para este tipo de aplicación.
+
+A nivel de sincronización, se usaron primitivas básicas para mantener consistencia y evitar bloqueos:
+
+- Locks para proteger recursos compartidos y evitar condiciones de carrera.
+- Una barrera para coordinar el punto en que todas las agencias terminaron de enviar apuestas antes de habilitar la etapa de ganadores.
+- Un evento de parada para coordinar el cierre ordenado del servidor cuando recibe señales del sistema.
 
 ---
 
