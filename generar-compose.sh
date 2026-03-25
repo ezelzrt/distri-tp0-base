@@ -5,7 +5,7 @@ num_clients="$2"
 echo "output file: $outfile"
 echo "number of clients: $num_clients"
 
-cat > $outfile <<'EOF'
+cat > $outfile <<EOF
 name: tp0
 
 networks:
