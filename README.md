@@ -32,15 +32,7 @@ Formato de cada mensaje:
 
 - `client/config.yaml`: configuración cliente (server address, log level).
 - `server/config.ini`: configuración servidor (puerto, backlog, log level).
-- `client/.env`: variables de apuesta (CLI_NOMBRE, CLI_APELLIDO, CLI_DOCUMENTO, CLI_NACIMIENTO, CLI_NUMERO).
-
-2) .env
-
-Copia el `.env.example` a `.env` antes de arrancar:
-
-```bash
-cp .env.example .env
-```
+- `.env.testing`: variables de apuesta (CLI_NOMBRE, CLI_APELLIDO, CLI_DOCUMENTO, CLI_NACIMIENTO, CLI_NUMERO).
 
 3) Levantar el sistema
 
