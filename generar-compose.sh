@@ -22,6 +22,7 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - SRV_AGENCY_AMOUNT=${num_clients}
     networks:
       - testing_net
     volumes:

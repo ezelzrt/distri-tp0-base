@@ -7,6 +7,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,7 +33,6 @@ type ClientConfig struct {
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
-	// bets   []domain.Bet
 	conn   net.Conn
 }
 
@@ -75,10 +76,27 @@ func (c *Client) StartClientLoop() {
 	
 	c.createClientSocket()
 
+	shouldReturn := sendBets(ctx, c)
+	if shouldReturn {
+		return
+	}
+
+	winners, shouldReturn := handleWinnersMessageExchange(c)
+	if shouldReturn {
+		return
+	}
+
+	log.Infof("action: consulta_ganadores | result: success | client_id: %v | cant_ganadores: %v", c.config.ID, len(winners))
+
+	c.conn.Close()
+	log.Infof("action: connection_closed | result: success | client_id: %v", c.config.ID)
+}
+
+func sendBets(ctx context.Context, c *Client) bool {
 	file, err := os.Open(c.config.BetsFilePath)
 	if err != nil {
 		log.Criticalf("action: open_bets_file | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		return
+		return true
 	}
 	defer file.Close()
 
@@ -87,46 +105,51 @@ func (c *Client) StartClientLoop() {
 	batchCount := 0
 	for scanner.Scan() {
 		select {
-        case <-ctx.Done():
-            log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
-            return
-        default:
-        }
+		case <-ctx.Done():
+			log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
+			return true
+		default:
+		}
 
 		lineCopy := append([]byte(nil), scanner.Bytes()...)
-		
+
 		if len(batch)+len(lineCopy)+1 > protocol.MaxPayloadSize {
-			if err := handleMessageExchange(c, batch); err != nil {
+			if err := handleSendBetsMessageExchange(c, batch, false); err != nil {
 				batchCount = 0
-				break
+				return true
 			}
 			batch = nil
 			batchCount = 0
-		} 
+		}
+
+		if batchCount == c.config.MaxBatchSize {
+			if err := handleSendBetsMessageExchange(c, batch, false); err != nil {
+				batchCount = 0
+				return true
+			}
+			batch = nil
+			batchCount = 0
+		}
 
 		batch = append(batch, lineCopy...)
 		batch = append(batch, '\n')
 		batchCount++
-		
-		if batchCount == c.config.MaxBatchSize {
-			if err := handleMessageExchange(c, batch); err != nil {
-				batchCount = 0
-				break
-			}	
-			batch = nil
-			batchCount = 0
-		}
 	}
 
-	if batchCount > 0 {
-		handleMessageExchange(c, batch)
+
+	if err := handleSendBetsMessageExchange(c, batch, true); err != nil {
+		return true
 	}
-	c.conn.Close()
-	log.Infof("action: connection_closed | result: success | client_id: %v", c.config.ID)
+	return false
 }
 
-func handleMessageExchange(c *Client, payload []byte) error {
-	if err := protocol.SendMsg(c.conn, protocol.BetType, payload); err != nil {
+func handleSendBetsMessageExchange(c *Client, payload []byte, eof bool) error {
+	agencyID, err := strconv.Atoi(c.config.ID)
+	if err != nil {
+		log.Errorf("action: convert_agency_id | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return err
+	}
+	if err := protocol.SendMsg(c.conn, protocol.BetType, uint16(agencyID), eof, payload); err != nil {
 		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
@@ -134,7 +157,7 @@ func handleMessageExchange(c *Client, payload []byte) error {
 		return err
 	}
 
-	msgType, ackPayload, err := protocol.ReadMsg(c.conn)
+	msgType, _, _, ackPayload, err := protocol.ReadMsg(c.conn)
 	if err != nil {
 		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
 			c.config.ID,
@@ -163,4 +186,39 @@ func handleMessageExchange(c *Client, payload []byte) error {
 	}
 
 	return nil
+}
+
+func handleWinnersMessageExchange(c *Client) ([]string, bool) {
+	agencyID, err := strconv.Atoi(c.config.ID)
+	if err != nil {
+		log.Errorf("action: convert_agency_id | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return nil, true
+	}
+
+	err = protocol.SendMsg(c.conn, protocol.WinnerQueryType, uint16(agencyID), false, nil)
+	if err != nil {
+		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return nil, true
+	}
+
+	eof := false
+	var winners []string
+	for !eof {
+
+		msgType, _, eofFlag, payload, err := protocol.ReadMsg(c.conn)
+		if err != nil {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			return nil, true
+		}
+		
+		if msgType != protocol.WinnerResponseType {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: unexpected message type %v", c.config.ID, msgType)
+			return nil, true
+		}
+		eof = eofFlag
+		payloadStr := string(payload)
+		lines := strings.Split(payloadStr, "\n")
+		winners = append(winners, lines...)
+	}
+	return winners, false
 }
