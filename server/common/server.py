@@ -167,6 +167,9 @@ class Server:
 
         with self._winners_lock:
             winners = self._winners_by_agency.get(agency_id, [])
-        payload = "\n".join([f"{bet.document}" for bet in winners]).encode('utf-8')
+        if len(winners) == 0:
+            payload = b""
+        else:
+            payload = "\n".join([f"{bet.document}" for bet in winners]).encode('utf-8')
 
         protocol.send_message(client_sock, protocol.TYPE_WINNER_RESPONSE, 0, True, payload)

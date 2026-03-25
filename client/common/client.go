@@ -215,6 +215,9 @@ func handleWinnersMessageExchange(c *Client) ([]string, bool) {
 			log.Errorf("action: receive_message | result: fail | client_id: %v | error: unexpected message type %v", c.config.ID, msgType)
 			return nil, true
 		}
+		if len(payload) == 0 {
+			break
+		}
 		eof = eofFlag
 		payloadStr := string(payload)
 		lines := strings.Split(payloadStr, "\n")
