@@ -1,45 +1,57 @@
 # TP0: Docker + Comunicaciones + Concurrencia
 
-## Ejercicio 6 - Procesamiento por batch
+## Ejercicio 7
 
 ### Protocolo Implementado (Go/Python)
 
 Formato de cada mensaje:
 
 - 1 byte: `Type`
-  - `0` = batch de apuestas
-  - `1` = ACK
+- 2 bytes: `Agency ID` en big-endian (numero de agencia)
+- 1 byte: `EOF flag` (0 o 1)
 - 4 bytes: `Length` en big-endian (tamaño del payload)
 - `Length` bytes: `Payload` (UTF-8)
 
-Para la request batch:
-- payload = apuestas CSV separadas por `\n`, cada apuesta con formato `A,B,00000000,2000-01-01,0` (nombre, apellido, documento, nacimiento, numero).
+Header total: 8 bytes
 
-Para el ACK:
-- payload `b"0"` = batch exitoso
-- payload `b"1"` = batch con error
+Tipos de mensaje:
 
-#### Diagrama ASCII del paquete batch
+- 0: batch de apuestas
+- 1: ACK
+- 2: consulta de ganadores
+- 3: respuesta de ganadores
+
+Criterio de uso:
+
+- El cliente envía Type 0 para apuestas y marca EOF en el último envío.
+- El servidor responde ACK por cada batch:
+  - Payload 0: éxito
+  - Payload 1: error
+- Terminadas las apuestas y luego del sorteo, el cliente envía Type 2.
+- El servidor responde Type 3 con lista de DNI ganadores de esa agencia.
+
+
+
+#### Diagrama del formato del mensaje:
 
 ```
-+------+------------+--------------------------------------------------------------+
-| Type | Length     | Payload                                                      |
-| (1B) | (4B BE)    | (N bytes)                                                    |
-+------+------------+--------------------------------------------------------------+
-| 0x00 | 0x0000004B | "A,B,00000001,2000-01-01,1234\nC,D,00000002,2000-01-01,5678" |
-+------+------------+--------------------------------------------------------------+
+0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|     Type      |           Agency ID           |   EOF Flag    |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                        Payload Length                         |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                                                               |
+.                                                               .
+.                   Payload (Variable Length)                   .
+.                                                               .
+|                                                               |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
 
-#### Diagrama ASCII del paquete ACK
-
-```
-+------+------------+------------------+
-| Type | Length     | Payload          |
-| (1B) | (4B BE)    | (N bytes)        |
-+------+------------+------------------+
-| 0x01 | 0x00000001 | "0" (success)    |
-+------+------------+------------------+
-```
+#### Decisiones de Diseño
+Se decidió un formato de mensaje con un header fijo de 8 bytes para simplificar la implementación y mantener la claridad del protocolo (en lugar de empaquetar el flag EOF y el Agency ID en un solo byte). Esto para priorizar un código limpio y sencillo por sobre una, tal vez, micro-optimización de espacio prematura.
 
 ---
 
@@ -71,8 +83,9 @@ make docker-compose-logs
 ```
 
 Debe verse:
-- `client1 | action: config | result: success ...`
-- `server | action: apuesta_recibida | result: success | cantidad: N`
+- `action: apuesta_recibida | result: success | cantidad: N`
+- `action: sorteo | result: success`
+- `action: consulta_ganadores | result: success | cant_ganadores: N`
 
 5) Detener el sistema
 
